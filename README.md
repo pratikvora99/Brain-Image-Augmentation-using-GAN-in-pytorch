@@ -11,29 +11,36 @@ Personal blog link: https://medium.com/@16bit108/cyclegan-brain-image-augmentati
 
 ![Image CycleGAN Architecture](./img/cyclegan_arch.png)
 
-In CycleGAN, there are two generators and two discriminators. Considering Generators as G and F and discriminators DX and DY, they are all used to perform style transfer between two domains X and Y. Here, X is a stack of images from type T1, T1-Ce, and T2. And Y will have a single image from FLAIR. X and Y will be given as input to G and F to produce reconstructed images Y' and X' respectively. X' and Y' will be passed on to DX and DY along with real images X and Y to train the discriminators using LSloss. Then using X' and Y', G and F will reproduce Y" and X". These will be compared with X and Y (real images) using SSIM loss and L1loss which is called as cyclic consistency loss. In this way, generator is trained. The remaining specifications are provided below.
+In CycleGAN, there are two generators and two discriminators. Considering Generators as G and F and discriminators $`D_X`$ and $`D_Y`$, they are all used to perform style transfer between two domains X and Y. Here, X is a stack of images from type T1, T1-Ce, and T2. And Y will have a single image from FLAIR. X and Y will be given as input to G and F to produce reconstructed images Y' and X' respectively. X' and Y' will be passed on to $`D_X`$ and $`D_Y`$ along with real images X and Y to train the discriminators using LSloss. Then using X' and Y', G and F will reproduce Y" and X". These will be compared with X and Y (real images) using SSIM loss and L1loss which is called as cyclic consistency loss. In this way, generator is trained. The remaining specifications are provided below.
 
 The generator uses CCNR modules. A CCNR module is comprised of two parallel conv blocks of 1x1 and 3x3 kernels. Using padding, they are then concatenated.
 
+## Losses:
+
+### Generators:
 The Generators reduce cycle loss and adversarial loss. The cycle loss is as follows:
 
-  ![Equation](https://latex.codecogs.com/png.latex?cycle\\_loss=2*L1(X,X'')+2*L1(Y,Y'')+SSIM(Y,Y'')+SSIM(X,X'')+2(2*L1(X,X')+2*L1(Y,Y')+SSIM(Y,Y')+SSIM(X,X')))
+  $`cycle\_loss=2*L1(X,X'')+2*L1(Y,Y'')+SSIM(Y,Y'')+SSIM(X,X'')+2(2*L1(X,X')+2*L1(Y,Y')+SSIM(Y,Y')+SSIM(X,X'))`$
 
-  ![Equation](https://latex.codecogs.com/png.latex?adversarial\\_loss=LSLoss(D(X'),1)) (For Generator G)
-  ![Equation](https://latex.codecogs.com/png.latex?adversarial\\_loss=LSLoss(D(Y'),1)) (For Generator F)
+  $`adversarial\_loss\_1=LSLoss(D_X(X'),1)`$ (For Generator G)
+  
+  $`adversarial\_loss\_2=LSLoss(D_Y(Y'),1)`$ (For Generator F)
 
-The Discriminators decrease the adversarial loss only. Here, D_X, D_Y, D_X' and D_Y' are equal to DX(X), DY(y), DX(X’) and DY(Y’) respectively. 
+### Discriminators:
+The Discriminators decrease the adversarial loss only.
+
   (For Discriminator DX)
-  ![Equation](https://latex.codecogs.com/png.latex?adversarial\\_loss=LSLoss(D_X,1)+LSLoss(D_X',0)) 
+  $`adversarial\_loss\_1=LSLoss(D_X(X),1)+LSLoss(D_X(X'),0))`$
+  
   (For Discriminator DY)
-  ![Equation](https://latex.codecogs.com/png.latex?adversarial\\_loss=LSLoss(D_Y,1)+LSLoss(D_Y',0)) 
+  $`adversarial\_loss\_2=LSLoss(D_Y(Y),1)+LSLoss(D_Y(Y'),0)`$ 
 
 The hyperparameters are specified below:
 1. Batch Size = 20
 2. Learning Rates:
-   1. Generator G: 1 * 10 -3
-   2. Generator F: 0.5 * 10 -3
-   3. Discriminators: 10 -6
+   1. Generator G: $`10^{-3}`$
+   2. Generator F: $`0.5 * 10^{-3}`$
+   3. Discriminators: $`10^{-6}`$
 3. Number of updates for both networks: 1 per epoch
 4. Weights of cycle loss (lambda1 and lambda2): 0.3
 5. Ratio of SSIM loss to L1 loss in cycle loss: 1:2
@@ -57,9 +64,17 @@ Pipeline of CollaGAN is choosing random type and removing it for each batch, cre
 
 ## Losses:
 1. Least Squared Loss:
+   $`L^{dsc}_{gan}(D_{gan})=E_{x_K}[(D_{gan}(x_K)-1)^2] + E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}))^2]`$
+   $`L^{gen}_{gan}(G) = E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}-1))^2]`$
 2. Categorical Cross Entropy:
+
+   $`L^{real}_{clsf}(D_{clsf}) = E_{x_K}[-log(D_{clsf}(K;x_K))]`$
 3. L1 and L2 distance loss:
-4. SSIM loss:
+
+   $`L_{mcc,a} = \|x_b - \bar{x}_{b|a}\|_1 + \|x_c - \bar{x}_{c|a}\|_1 + \|x_d - \bar{x}_{d|a}\|_1`$
+5. SSIM loss:
+
+   $`SSIM(p) = \frac{2\mu_X\mu_Y+C_1}{\mu_X^2+\mu_Y^2+C_1}*\frac{\sigma{XY} + C_2}{\sigma_X^2+\sigma_Y^2+C_2}`$
 
 We used https://github.com/Po-Hsun-Su/pytorch-ssim library to which has inbuilt ssim loss function for maximizing loss as 1 being max value gives best result and we used second formula to changed it minimizing loss would give better result. 
 
