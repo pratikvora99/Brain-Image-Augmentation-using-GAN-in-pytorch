@@ -54,24 +54,59 @@ While this architecture was successful in creating novel brain images, it requir
 
 This Figure shows the architecture used for the Generator of CollaGAN:
 
-![Image CollaGAN_architecture][./img/collagan_arch.png]
+![Image CollaGAN Architecture](./img/collagan_arch.png)
 
-All inputs have their own encoding branches for which Input here is of shape (5,240,240) using channel first as we used pytorch 1 for inputs a,b,c,d and 4 for mask which is one hot encoded in channel so only one channel has 1 and others have 0 signifying the missing data.
+Each input follows an **independent encoding branch**, where the input shape is **(5, 240, 240)** in **channel-first** format, as used in **PyTorch**. The first four channels correspond to inputs **a, b, c,** and **d**, while the fifth channel represents a **one-hot encoded mask**, ensuring that only one channel is active at a time to indicate missing data.
 
-Then we have 4 CCNL and Max Pool combination layers. CCNL has two conv layers with 1x1 and 3x3 filter size and 3x3 layers has padding to maintain size as they get concated ahead. Then go through Instance Normalization layer. Then comes the activation layer of Leaky ReLU with leak of 0.01.
+### **Encoder Architecture**
+- The encoding path consists of **4 CCNL (Concatenated Convolutional Layers) and Max Pool combinations**.
+- Each **CCNL** contains two convolutional layers:  
+  - **1x1 filter** for feature transformation.  
+  - **3x3 filter** with padding to maintain spatial dimensions.  
+- The output undergoes **Instance Normalization** followed by a **Leaky ReLU** activation with a **leak factor of 0.01**.
 
-Then comes decoding branch which takes concated input from each of the encoding branch. Decoding branch has 4 CCNL, CCAM and ConvTranspose combination. CCAM is used to influence the output of CCNL with the mask vector, here mask vector will be 1d or vector with 4 values one hot encoded unlike start where mask is full image.As for CCAM first the average is taken over dim or axis (2,3) so giving 1d or vector output of (batch_size,channel) shape and this is concated with 1d mask vector of (batch_size,4) shape This goes through MLP of 3 Fully Connected layers with LeakyReLU,LeakyReLU,Sigmoid as activations and final output layers has same neurons as channel of input, then the input is multiplied with this output channel wise influencing mask into the input. Then ConvTranspose is used for learned up-sampling.
+### **Decoder Architecture**
+- The decoder receives the concatenated outputs from all encoding branches.
+- It comprises **4 CCNL layers**, **CCAM (Channel-wise Conditional Attention Module)**, and **ConvTranspose** layers.
+- **CCAM** adjusts the output by incorporating the mask vector.  
+  - Initially, the mask is **one-hot encoded** across the spatial dimensions.
+  - The **mean is computed over axes (2,3)**, converting it into a **1D vector** of shape **(batch_size, channel)**.
+  - This is concatenated with the **mask vector (batch_size, 4)** and processed through a **Multi-Layer Perceptron (MLP)** with three fully connected layers:
+    - Activations: **Leaky ReLU, Leaky ReLU, Sigmoid**.
+    - The final output has the same number of neurons as the input channels.
+  - The mask-modulated output is **multiplied channel-wise** with the original input.
+- **ConvTranspose layers** are used for **learned up-sampling**.
+- A final **CCNL layer** refines the **imputed image**.
 
-Then a final CCNL layer is added to final process the imputed image.
+---
 
-As for Discriminator input is (1,240,240) shape and is processed in 3 paths all giving the same number of channels in the output. Path 1 is 4 Conv Layers,Path 2 is 2 Conv+Maxpooling and then Conv+Leaky ReLU, Path 3 is 4 Conv Layers with LeakyReLU as activation on 2nd and 3rd layer. Then concating the outputs of all Path they go through merge section where all individually process information is merged with 2 Conv+Leaky ReLU layers. Then further branches are created 1 for prediction real or fake(rf branch) and one for predicting which class(classify branch). Rf branch has 2 Conv2d and final activation is Sigmoid for getting probability of real and fake. Classify branch is the same just with different channel in output and with softmax activation over channel for classifying into which class the input belongs.
+### **Discriminator Architecture**
+- The discriminator takes an input of shape **(1, 240, 240)** and processes it through **three parallel paths**, each producing the same number of output channels:
+  1. **Path 1**: 4 Convolutional Layers.
+  2. **Path 2**: 2 Convolution + MaxPooling layers, followed by Conv + Leaky ReLU.
+  3. **Path 3**: 4 Convolutional Layers, with **Leaky ReLU activations** in the 2nd and 3rd layers.
+- The outputs from all paths are **concatenated** and passed through the **merge section**, consisting of **two Conv + Leaky ReLU layers**.
+- This merged output is then split into **two branches**:
+  - **RF (Real/Fake) Branch**:  
+    - Uses **two Conv2D layers**.  
+    - Final activation: **Sigmoid** (probability of real vs. fake).
+  - **Classification Branch**:  
+    - Similar structure but with a **Softmax activation** over channels to classify the input into the correct category.
 
-Pipeline of CollaGAN is choosing random type and removing it for each batch, creating appropriate mask, concating mask to images and then giving them to generator to get reconstructed(recon) image. Discriminator then takes real and fake image and gives 2 output for each. Then using recon and other 3, we create 4 new recons by removing one type and using others to generate it again with 4 masks. All of the pass through discriminator and give 2 output each.
+---
 
-## Losses:
-1. Least Squared Loss:
-   $`L^{dsc}_{gan}(D_{gan})=E_{x_K}[(D_{gan}(x_K)-1)^2] + E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}))^2]`$
-   $`L^{gen}_{gan}(G) = E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}-1))^2]`$
+### **CollaGAN Pipeline**
+1. A **random image type is removed** for each batch.
+2. The corresponding **mask is generated** and concatenated with the remaining images.
+3. The modified input is passed to the **generator**, producing a **reconstructed image**.
+4. The **discriminator evaluates both real and reconstructed images**, generating **two outputs** per image.
+5. Using the reconstructed image and the other three original inputs, we generate **four new reconstructions**, each formed by removing a different type and regenerating it with a **mask**.
+6. These newly generated images are **fed back into the discriminator**, producing **two outputs per reconstruction**.
+
+### Losses:
+1. Least Squares Loss:<br>
+   $`L^{dsc}_{gan}(D_{gan})=E_{x_K}[(D_{gan}(x_K)-1)^2] + E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}))^2]`$<br>
+   $`L^{gen}_{gan}(G) = E_{\hat{x}_{K|K}}[(D_{gan}(\hat{x}_{K|K}-1))^2]`$<br>
 2. Categorical Cross Entropy:
 
    $`L^{real}_{clsf}(D_{clsf}) = E_{x_K}[-log(D_{clsf}(K;x_K))]`$
@@ -82,25 +117,49 @@ Pipeline of CollaGAN is choosing random type and removing it for each batch, cre
 
    $`SSIM(p) = \frac{2\mu_X\mu_Y+C_1}{\mu_X^2+\mu_Y^2+C_1}*\frac{\sigma{XY} + C_2}{\sigma_X^2+\sigma_Y^2+C_2}`$
 
-We used https://github.com/Po-Hsun-Su/pytorch-ssim library to which has inbuilt ssim loss function for maximizing loss as 1 being max value gives best result and we used second formula to changed it minimizing loss would give better result. 
+We utilized the [**PyTorch SSIM library**](https://github.com/Po-Hsun-Su/pytorch-ssim), which provides an **inbuilt SSIM loss function**. The library maximizes the SSIM score, where **1** indicates the highest image similarity. However, we adopted a modified version of the **second SSIM formula** to reformulate the objective as a **minimization loss**, making lower values correspond to better performance.
 
-Generator minimizes
-L2 distance between recon, 4 new cyclic recons with target, 4 inputs respectively
-So 5 L2 loss
-L1 distance between recon, 4 new cyclic recons with target, 4 inputs respectively
-So 5 L1 loss
-SSIM between recon, 4 new cyclic recons with target, 4 inputs respectively
-So 5 SSIM
+### **Generator Loss Functions**
+The generator minimizes multiple loss components to guide the reconstruction process:
+- **L2 Distance Loss**: Measures pixel-wise squared differences between:
+  - Reconstructed image (recon) and target.
+  - Four cyclic reconstructions and their corresponding targets.
+  - Four cyclic reconstructions and their respective inputs.
 
-Least squared loss which takes 5 recons’ rf and target values which are real for Gen as it wants to fool discriminator.
+  **Total:** 5 L2 losses  
+   
+- **L1 Distance Loss**: Similar to L2 but penalizes absolute differences.
 
-Categorical Cross Entropy which takes 5 recons’ class value and target value being class for that recon.
+  **Total:** 5 L1 losses  
 
-So these 25 loss added up to final generator loss but,
+- **SSIM Loss**: Structural Similarity Index between the reconstructed images and their corresponding targets or inputs.
 
-All these have 7 hyper parameters attached which decides the contribution of these losses to the overall loss.
+  **Total:** 5 SSIM losses  
 
-Discriminator minimizes:
-Categorical Cross entropy loss for class of original 4 inputs with corresponding targets. Least sqaured Loss for all real images and fake recons.
+- **Least Squares Loss (LSLoss)**: Enforces the generator to produce realistic reconstructions by fooling the discriminator. This loss is applied on the discriminator’s **real/fake (RF)** predictions for the 5 reconstructed images.
 
-So 4 cce loss + 10 ls loss add up to final loss.
+- **Categorical Cross Entropy (CCE)**: Classifies the reconstructed images into their respective types, with the target class label for each reconstruction.
+
+---
+
+### **Hyperparameters**
+Each loss term is weighted by **7 hyperparameters** that control its contribution to the final generator loss:
+```
+lambda_gen_ls = 0.5
+lambda_l1_cyc = 10
+lambda_l1 = 1
+lambda_l2_cyc = 10
+lambda_l2 = 0
+lambda_ce_gen = 15
+lambda_ssim = 1
+```
+The combined generator loss is the **weighted sum** of 25 individual loss components.
+
+---
+
+### **Discriminator Loss Functions**
+The discriminator simultaneously optimizes:
+- **Categorical Cross Entropy (CCE)**: Classifies the four original inputs into their correct types.
+- **Least Squares Loss (LSLoss)**: Distinguishes between real images and the reconstructed fake images.
+
+**Total Loss = 4 CCE losses + 10 LS losses**
