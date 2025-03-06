@@ -7,13 +7,15 @@ Our major objective was to use GANs to create novel images of a brain in a certa
 We will discuss the two in detail now. The code for both are present in the repo.
 
 ## CycleGAN: 
-Personal blog link: https://medium.com/@16bit108/cyclegan-brain-image-augmentation-8449f8911f0f
+[Personal blog link](https://medium.com/@16bit108/cyclegan-brain-image-augmentation-8449f8911f0f) for detailed explanation on CycleGAN.
 
 ![Image CycleGAN Architecture](./img/cyclegan_arch.png)
 
-In CycleGAN, there are two generators and two discriminators. Considering Generators as G and F and discriminators $`D_X`$ and $`D_Y`$, they are all used to perform style transfer between two domains X and Y. Here, X is a stack of images from type T1, T1-Ce, and T2. And Y will have a single image from FLAIR. X and Y will be given as input to G and F to produce reconstructed images Y' and X' respectively. X' and Y' will be passed on to $`D_X`$ and $`D_Y`$ along with real images X and Y to train the discriminators using LSloss. Then using X' and Y', G and F will reproduce Y" and X". These will be compared with X and Y (real images) using SSIM loss and L1loss which is called as cyclic consistency loss. In this way, generator is trained. The remaining specifications are provided below.
+In CycleGAN, two generators (G and F) and two discriminators ($`D_X`$ and $`D_Y`$) collaborate to perform style transfer between two domains, X and Y. The domain X consists of a stack of images from three modalities, for e.g., T1, T1-Ce, and T2, while Y contains a single target modality, for e.g, FLAIR. We will need to create four such GAN networks for each of the modalities. CollaGAN addresses this issue, which will be discussed later. 
 
-The generator uses CCNR modules. A CCNR module is comprised of two parallel conv blocks of 1x1 and 3x3 kernels. Using padding, they are then concatenated.
+The generators receive X and Y as inputs, producing reconstructed images Y' and X', respectively. These outputs, along with the original images, are passed through the discriminators to optimize the Least Squares Loss (LSLoss). Subsequently, G and F regenerate Y" and X", which are compared with the real images (Y and X) using SSIM Loss and L1 Loss — collectively termed as cyclic consistency loss. This two-step cyclic process ensures that the generators learn to preserve semantic information during style transfer.
+
+The generator architecture leverages CCNR modules — composed of two parallel convolutional blocks with 1x1 and 3x3 kernels. The outputs are concatenated along the channel dimension using appropriate padding, enhancing feature representation while preserving spatial information.
 
 ## Losses:
 
@@ -46,9 +48,13 @@ The hyperparameters are specified below:
 5. Ratio of SSIM loss to L1 loss in cycle loss: 1:2
 6. Ratio of construction to reconstruction loss (i.e. cycleloss(X’) : cycleloss(X”)): 2:1
 
+While this architecture was successful in creating novel brain images, it required four GAN networks for each of the modalities. This issue was addressed by the use of CollaGAN.
+
 ## CollaGAN
 
-This Figure shows the architecture used for the Generator of CollaGAN
+This Figure shows the architecture used for the Generator of CollaGAN:
+
+![Image CollaGAN_architecture][./img/collagan_arch.png]
 
 All inputs have their own encoding branches for which Input here is of shape (5,240,240) using channel first as we used pytorch 1 for inputs a,b,c,d and 4 for mask which is one hot encoded in channel so only one channel has 1 and others have 0 signifying the missing data.
 
