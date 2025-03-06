@@ -115,7 +115,7 @@ Each input follows an **independent encoding branch**, where the input shape is 
    $`L_{mcc,a} = \|x_b - \bar{x}_{b|a}\|_1 + \|x_c - \bar{x}_{c|a}\|_1 + \|x_d - \bar{x}_{d|a}\|_1`$
 5. SSIM loss:
 
-   $`SSIM(p) = \frac{2\mu_X\mu_Y+C_1}{\mu_X^2+\mu_Y^2+C_1}*\frac{\sigma{XY} + C_2}{\sigma_X^2+\sigma_Y^2+C_2}`$
+   $`SSIM(p) = \frac{2\mu_X\mu_Y+C_1}{\mu_X^2+\mu_Y^2+C_1}*\frac{\sigma_{XY} + C_2}{\sigma_X^2+\sigma_Y^2+C_2}`$
 
 We utilized the [**PyTorch SSIM library**](https://github.com/Po-Hsun-Su/pytorch-ssim), which provides an **inbuilt SSIM loss function**. The library maximizes the SSIM score, where **1** indicates the highest image similarity. However, we adopted a modified version of the **second SSIM formula** to reformulate the objective as a **minimization loss**, making lower values correspond to better performance.
 
